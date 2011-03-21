@@ -73,11 +73,9 @@
 ;;          (yaml-path/path)))
 ;;      (ad-activate 'previous-line)   ;; DO NOT DO THIS!
 
-;; -------------------------------------------------------------------------------- cut here ------------------------------------------------------------------------
 (defun yaml-path/empty-line? ()
-  (let ((b (save-excursion (beginning-of-line) (point)))
-	(e (save-excursion (end-of-line) (point))))
-    (= b e)))
+  (let ((p (string-match-p "^\\s-*$" (buffer-substring-no-properties (point-at-bol) (point-at-eol)))))
+    (and p (zerop p))))
 
 (defun yaml-path/comment-line? ()
   (save-excursion
@@ -141,7 +139,8 @@ In other words, the parent of the YAML element on the line containing starting-p
 (defun yaml-path/path ()
   "Display the path to the current YAML element in the message area."
   (interactive)
-  (when (yaml-path/yaml-line?)
+  (if (not (yaml-path/yaml-line?))
+      (message "There's no YAML element here.")
     (let ((path (apply #'concatenate 'string
 		       (reverse (mapcar #'(lambda (s) (format "%s/" s))
 					(yaml-path/tags-of-interest (point) (current-indentation)))))))
