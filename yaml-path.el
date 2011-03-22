@@ -146,4 +146,54 @@ In other words, the parent of the YAML element on the line containing starting-p
 					(yaml-path/tags-of-interest (point) (current-indentation)))))))
       (message (format "%s%s" path (yaml-path/tag-at-point (point)))))))
 
+(defun yaml-path/ruby-expression ()
+  "Return Ruby expression that selects the current YAML element.
+E.g. ['foo']['bar']['baz']"
+  (when (yaml-path/yaml-line?)
+    (let* ((path (apply #'concatenate 'string
+			(reverse (mapcar #'(lambda (s) (format "['%s']" s))
+					 (yaml-path/tags-of-interest (point) (current-indentation))))))
+	   (leaf (format "['%s']" (yaml-path/tag-at-point (point)))))
+      (format "%s%s" path leaf))))
+
+(defun yaml-path/display-ruby-expression ()
+  "Display (in the message area) the  Ruby expression that selects the current YAML element.
+The expression is also added to the kill-ring.
+
+E.g. ['foo']['bar']['baz']"
+  (interactive)
+  (let ((msg (yaml-path/ruby-expression)))
+    (if msg
+	(progn (message msg)
+	       (kill-new msg))
+      (message "There's no YAML element here."))))
+
+(defun yaml-path/ruby-invocation ()
+  "Return the Ruby command line that selects and prints the current YAML element.
+E.g.  \"ruby -e \\\"require 'yaml'\\\" -e \\\"puts YAML.load_file('/tmp/test.yml')['foo']['bar']['baz']\\\"\""
+  (let ((expression (yaml-path/ruby-expression)))
+    (when expression
+      (format "ruby -e \"require 'yaml'\" -e \"puts YAML.load_file('%s')%s\"" (buffer-file-name) expression))))
+
+
+(defun yaml-path/display-ruby-invocation ()
+  "Display the Ruby command line that selects and prints the current YAML element.
+The command line is also added to the kill-ring.
+
+E.g.  \"ruby -e \\\"require 'yaml'\\\" -e \\\"puts YAML.load_file('/tmp/test.yml')['foo']['bar']['baz']\\\"\""
+  (interactive)
+  (let ((msg (yaml-path/ruby-invocation)))
+    (if msg
+	(progn (message msg)
+	       (kill-new msg))
+      (message "There's no YAML element here."))))
+
+(defun yaml-path/%%test-ruby-invocation%% ()
+  "Fuck it.  Call ruby to check our work."
+  (interactive)
+  (let ((cmd (yaml-path/ruby-invocation)))
+    (if cmd
+	(shell-command cmd)
+      (message "There's no YAML element here."))))
+
 (provide 'yaml-path)
