@@ -3,8 +3,9 @@
 ;; Copyright (C) 2011  Craig B. Ludington 
 
 ;; Author: Craig B. Ludington <me@alpheus.me>
+;; URL: http://alpheus.me/src/emacs/yaml-path/yaml-path.el
 ;; Keywords: yaml path
-;; Version: 0.0.1
+;; Version: 0.0.2
 
 ;; This file is not part of Emacs
 
