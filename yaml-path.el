@@ -1,6 +1,6 @@
 ;;; yaml-path.el --- Extends yaml-mode to display the path of the current yaml element in the message area.
 
-;; Copyright (C) 2011  Craig B. Ludington 
+;; Copyright (C) 2011  Craig B. Ludington
 
 ;; Author: Craig B. Ludington <me@alpheus.me>
 ;; URL: http://alpheus.me/src/emacs/yaml-path/yaml-path.el
@@ -26,15 +26,15 @@
 
 ;;; Commentary:
 
-;; This provides a function to display an xpath-like string 
+;; This provides a function to display an xpath-like string
 ;; for the yaml element on the current line.
 ;; It's meant to complement Yoshiki Kurihara's yaml-mode.el.
 ;;
 ;; It doesn't strictly depend on yaml-mode, but works better
-;; with yaml-mode.  (That's because yaml-mode makes syntax-ppss usable 
+;; with yaml-mode.  (That's because yaml-mode makes syntax-ppss usable
 ;; for locating comments.)
-;; 
-;; The only function you should need is yaml-path/path.  
+;;
+;; The only function you should need is yaml-path/path.
 ;; It's convenient to bind that to a key, e.g. C-c C-p.
 ;; (Instructions for doing that only in yaml-mode are below.)
 ;;
@@ -58,40 +58,41 @@
 
 ;;; Known Bugs:
 ;;
-;;    Should use line-number-at-pos and goto-line 
+;;    Should use line-number-at-pos and goto-line
 ;;    instead of using point everywhere.
 ;;
-;;    Should be faster, so that motion functions like next-line, previous-line 
+;;    Should be faster, so that motion functions like next-line, previous-line
 ;;    could be advised and the path would be continuously displayed.
 ;;
 ;;      The following is *NOT* advised (pun intended):
 ;;
 ;;      (defvar yaml-path/*constantly-display-yaml-path* t)
-;;      (defadvice previous-line (after yaml-path/constantly-display-yaml-path) 
+;;      (defadvice previous-line (after yaml-path/constantly-display-yaml-path)
 ;;        "Display the path of the current element of a YAML file in the message area."
 ;;        (when (and (eq major-mode 'yaml-mode)
 ;;      	     yaml-path/*constantly-display-yaml-path*)
 ;;          (yaml-path/path)))
 ;;      (ad-activate 'previous-line)   ;; DO NOT DO THIS!
+(require 'cl-lib)
 
-(defun yaml-path/empty-line? ()
+(cl-defun yaml-path/empty-line? ()
   (let ((p (string-match-p "^\\s-*$" (buffer-substring-no-properties (point-at-bol) (point-at-eol)))))
     (and p (zerop p))))
 
-(defun yaml-path/comment-line? ()
+(cl-defun yaml-path/comment-line? ()
   (save-excursion
     (move-to-column (current-indentation))
     (unless (eolp)
       (forward-char))
     (nth 4 (syntax-ppss))))
 
-(defun yaml-path/yaml-line? ()
+(cl-defun yaml-path/yaml-line? ()
   (not (or (yaml-path/empty-line?)
 	   (yaml-path/comment-line?))))
 
-(defun yaml-path/prev-yaml (&optional p)
+(cl-defun yaml-path/prev-yaml (&optional p)
   "Return the point of the yaml before the point p (default to current point) or nil."
-  (labels ((f ()
+  (cl-labels ((f ()
 	      (unless (= (point) (point-min))
 		(previous-line)
 		(beginning-of-line)
@@ -102,12 +103,12 @@
       (goto-char (or p (point)))
       (f))))
 
-(defun yaml-path/indentation-at-point (p)
+(cl-defun yaml-path/indentation-at-point (p)
   (save-excursion
     (goto-char p)
     (current-indentation)))
 
-(defun yaml-path/previous-less-indented-point (starting-point indentation)
+(cl-defun yaml-path/previous-less-indented-point (starting-point indentation)
   "Return a point on a YAML line (not a comment or empty line) that precedes starting-point and has less indentation.
 In other words, the parent of the YAML element on the line containing starting-point."
   (let ((p starting-point)
@@ -121,43 +122,43 @@ In other words, the parent of the YAML element on the line containing starting-p
 	(setq done? t)))
     result))
 
-(defun yaml-path/tag-at-point (p)
+(cl-defun yaml-path/tag-at-point (p)
   "Return a string representing the yaml tag on the line containing the point p."
-  (save-excursion (goto-char p) 
+  (save-excursion (goto-char p)
 		  (move-to-column (current-indentation))
 		  (substring-no-properties (thing-at-point 'sexp))))
 
-(defun yaml-path/tags-of-interest (p i)
+(cl-defun yaml-path/tags-of-interest (p i)
   "Return a list of yaml tags such that each one is on the chain."
-  (labels ((f (p i) 
+  (cl-labels ((f (p i)
 	      (let ((next-point (yaml-path/previous-less-indented-point p i)))
 		(when next-point
 		  (cons next-point (f next-point (yaml-path/indentation-at-point next-point)))))))
     (save-excursion
       (let ((points (f p i)))
-	(mapcar  #'yaml-path/tag-at-point points)))))
+	(cl-mapcar  #'yaml-path/tag-at-point points)))))
 
-(defun yaml-path/path ()
+(cl-defun yaml-path/path ()
   "Display the path to the current YAML element in the message area."
   (interactive)
   (if (not (yaml-path/yaml-line?))
       (message "There's no YAML element here.")
     (let ((path (apply #'concatenate 'string
-		       (reverse (mapcar #'(lambda (s) (format "%s/" s))
+		       (reverse (cl-mapcar #'(lambda (s) (format "%s/" s))
 					(yaml-path/tags-of-interest (point) (current-indentation)))))))
       (message (format "%s%s" path (yaml-path/tag-at-point (point)))))))
 
-(defun yaml-path/ruby-expression ()
+(cl-defun yaml-path/ruby-expression ()
   "Return Ruby expression that selects the current YAML element.
 E.g. ['foo']['bar']['baz']"
   (when (yaml-path/yaml-line?)
     (let* ((path (apply #'concatenate 'string
-			(reverse (mapcar #'(lambda (s) (format "['%s']" s))
+			(reverse (cl-mapcar #'(lambda (s) (format "['%s']" s))
 					 (yaml-path/tags-of-interest (point) (current-indentation))))))
 	   (leaf (format "['%s']" (yaml-path/tag-at-point (point)))))
       (format "%s%s" path leaf))))
 
-(defun yaml-path/display-ruby-expression ()
+(cl-defun yaml-path/display-ruby-expression ()
   "Display (in the message area) the  Ruby expression that selects the current YAML element.
 The expression is also added to the kill-ring.
 
@@ -169,7 +170,7 @@ E.g. ['foo']['bar']['baz']"
 	       (kill-new msg))
       (message "There's no YAML element here."))))
 
-(defun yaml-path/ruby-invocation ()
+(cl-defun yaml-path/ruby-invocation ()
   "Return the Ruby command line that selects and prints the current YAML element.
 E.g.  \"ruby -e \\\"require 'yaml'\\\" -e \\\"puts YAML.load_file('/tmp/test.yml')['foo']['bar']['baz']\\\"\""
   (let ((expression (yaml-path/ruby-expression)))
@@ -177,7 +178,7 @@ E.g.  \"ruby -e \\\"require 'yaml'\\\" -e \\\"puts YAML.load_file('/tmp/test.yml
       (format "ruby -e \"require 'yaml'\" -e \"puts YAML.load_file('%s')%s\"" (buffer-file-name) expression))))
 
 
-(defun yaml-path/display-ruby-invocation ()
+(cl-defun yaml-path/display-ruby-invocation ()
   "Display the Ruby command line that selects and prints the current YAML element.
 The command line is also added to the kill-ring.
 
@@ -189,7 +190,7 @@ E.g.  \"ruby -e \\\"require 'yaml'\\\" -e \\\"puts YAML.load_file('/tmp/test.yml
 	       (kill-new msg))
       (message "There's no YAML element here."))))
 
-(defun yaml-path/%%test-ruby-invocation%% ()
+(cl-defun yaml-path/%%test-ruby-invocation%% ()
   "Fuck it.  Call ruby to check our work."
   (interactive)
   (let ((cmd (yaml-path/ruby-invocation)))
